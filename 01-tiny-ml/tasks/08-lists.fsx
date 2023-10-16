@@ -2,6 +2,8 @@
 // 08 - Add unit and create a list value
 // ----------------------------------------------------------------------------
 
+open System.Reflection.Metadata
+
 type Value = 
   | ValNum of int 
   | ValClosure of string * Expression * VariableContext
@@ -55,16 +57,65 @@ let rec evaluate (ctx:VariableContext) e =
       | _ -> failwith ("unbound variable: " + v)
 
   // NOTE: You have the following from before
-  | Unary(op, e) -> failwith "implemented in step 2"
-  | If(econd, etrue, efalse) -> failwith "implemented in step 2"
-  | Lambda(v, e) -> failwith "implemented in step 3"
-  | Application(e1, e2) -> failwith "implemented in step 3"
-  | Let(v, e1, e2) -> failwith "implemented in step 4"
-  | Tuple(e1, e2) -> failwith "implemented in step 5"
-  | TupleGet(b, e) -> failwith "implemented in step 5"
-  | Match(e, v, e1, e2) -> failwith "implemented in step 6"
-  | Case(b, e) -> failwith "implemented in step 6"
-  | Recursive(v, e1, e2) -> failwith "implemented in step 7"
+  | Unary(op, e) ->
+      let v = evaluate ctx e
+      match v with
+      | ValNum n ->
+        match op with
+        | "-" -> ValNum(-n)
+        | _ -> failwith "unsupported unary operator"
+      | _ -> failwith "invalid argument of unary operator"
+      
+  | If(conditional, on_true, on_false) ->
+    let result = evaluate ctx conditional 
+    match result with
+    | ValNum n ->
+      match n with
+      | x when x = 1 -> evaluate ctx on_true
+      | _ -> evaluate ctx on_false
+    | _ -> failwith "invalid argument of if conditional expression"
+  
+  | Lambda(v, e) ->
+      ValClosure(v, e, ctx)
+
+  | Application(e1, e2) ->
+      let lambda = evaluate ctx e1
+      match lambda with
+      | ValClosure(s, expression, context) ->
+        let value = evaluate ctx e2
+        let newContext = context.Add(s, lazy value)
+        evaluate newContext expression
+      | _ -> failwith "first argument should be a function"
+
+  | Let(v, e1, e2) ->
+    let left = evaluate ctx e1
+    let newContext = ctx.Add(v, lazy left)
+    evaluate newContext e2
+
+  | Tuple(e1, e2) ->
+      ValTuple(evaluate ctx e1, evaluate ctx e2)
+  | TupleGet(b, e) ->
+      let tuple = evaluate ctx e
+      match tuple with
+      | ValTuple(first, second) -> if b then first else second
+      | _ -> failwith "Argument must be a tuple"
+
+  | Match(e, v, e1, e2) ->
+      let matchCase = evaluate ctx e
+      match matchCase with
+      | ValCase(i, j) ->
+        let newContext = ctx.Add(v, lazy j)
+        match i with
+        | true -> evaluate newContext e1
+        | false -> evaluate newContext e2
+      | _ -> failwith "Matcher should be a case."
+
+  | Case(b, e) ->
+      ValCase(b, evaluate ctx e)
+
+  | Recursive(v, e1, e2) ->
+      let rec newContext = ctx.Add(v, lazy evaluate newContext e1)
+      evaluate newContext e2
 
   // NOTE: This is so uninteresting I did this for you :-)
   | Unit -> ValUnit
@@ -115,7 +166,6 @@ let em =
   )
 evaluate Map.empty em
 
-// TODO: Can you implement 'List.filter' in TinyML too??
 // The somewhat silly example removes 3 from the list.
 // Add '%' binary operator and you can remove odd/even numbers!
 //
@@ -127,5 +177,23 @@ evaluate Map.empty em
 //     | Case2(Unit) -> Case2(Unit))
 //   in map (fun y -> y + (-2)) l
 //
-let ef = failwith "not implemented"
+let ef = 
+  Recursive("filter",
+    Lambda("f", Lambda("l", 
+      Match(
+        Variable("l"),
+        "x",
+        If(Application(Variable "f", TupleGet(true, Variable "x")),
+          Tuple(
+            TupleGet(true, Variable "x"),
+            Application(Application(Variable "filter", Variable "f"), TupleGet(false, Variable "x"))
+          ),
+          Application(Application(Variable "filter", Variable "f"), TupleGet(false, Variable "x"))),
+        Case(false, Unit)
+      )
+    )),
+    Application(Application(Variable "filter", 
+      Lambda("y", Binary("+", Variable "y", Constant -2))), el)
+  )
+evaluate Map.empty el
 evaluate Map.empty ef

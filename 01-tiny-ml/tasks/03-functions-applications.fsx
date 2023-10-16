@@ -38,34 +38,48 @@ let rec evaluate (ctx:VariableContext) e =
       let v1 = evaluate ctx e1
       let v2 = evaluate ctx e2
       match v1, v2 with 
-      // TODO: We added 'ValClosure' to 'Value', so this can now fail to 
-      // match (if you call binary operator with functions as arguments).
-      // Add a catch-all ('_') case and throw an exception using 'failwith'
-      // Also do the same for 'Unary' an 'If'!
       | ValNum n1, ValNum n2 -> 
           match op with 
           | "+" -> ValNum(n1 + n2)
           | "*" -> ValNum(n1 * n2)
           | _ -> failwith "unsupported binary operator"
+      | _ -> failwith "invalid upsie"
   | Variable(v) ->
       match ctx.TryFind v with 
       | Some res -> res
       | _ -> failwith ("unbound variable: " + v)
 
-  // NOTE: You have the following two from before
-  | Unary(op, e) -> failwith "implemented in step 2"
-  | If(econd, etrue, efalse) -> failwith "implemented in step 2"
+  | Unary(op, e) ->
+      let v = evaluate ctx e
+      match v with
+      | ValNum n ->
+        match op with
+        | "-" -> ValNum(-n)
+        | _ -> failwith "unsupported unary operator"
+      | _ -> failwith "invalid upsie"
+      
+  | If(conditional, on_true, on_false) ->
+    let result = evaluate ctx conditional 
+    match result with
+    | ValNum n ->
+      match n with
+      | x when x > 0 -> evaluate ctx on_true
+      | x when x <= 0 -> evaluate ctx on_false
+      | _ -> failwith "not supported result in expression"
+    | _ -> failwith "invalid upsie"
   
   | Lambda(v, e) ->
-      // TODO: Evaluate a lambda - create a closure value
-      failwith "not implemented"
+      ValClosure(v, e, VariableContext([]))
 
   | Application(e1, e2) ->
-      // TODO: Evaluate a function application. Recursively
-      // evaluate 'e1' and 'e2'; 'e1' must evaluate to a closure.
-      // You can then evaluate the closure body.
-      failwith "not implemented"
-
+      let lambda = evaluate ctx e1
+      match lambda with
+      | ValNum _ -> failwith "This should be a function!!!"
+      | ValClosure(s, expression, context) ->
+        let value = evaluate ctx e2
+        let newContext = context.Add(s, value)
+        evaluate newContext expression
+     
 // ----------------------------------------------------------------------------
 // Test cases
 // ----------------------------------------------------------------------------

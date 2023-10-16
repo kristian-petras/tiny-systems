@@ -44,10 +44,20 @@ let rec evaluate (ctx:VariableContext) e =
       | Some res -> res
       | _ -> failwith ("unbound variable: " + v)
   | Unary(op, e) ->
-      // TODO: Implement the case for 'Unary' here!
-      failwith "not implemented"
-  // TODO: Add the correct handling of 'If' here!
-
+      let v = evaluate ctx e
+      match v with
+      | ValNum n ->
+        match op with
+        | "-" -> ValNum(-n)
+        | _ -> failwith "unsupported unary operator"
+  | If(conditional, on_true, on_false) ->
+    let result = evaluate ctx conditional 
+    match result with
+    | ValNum n ->
+      match n with
+      | x when x > 0 -> evaluate ctx on_true
+      | x when x <= 0 -> evaluate ctx on_false
+      | _ -> failwith "not supported result in expression"
 
 // ----------------------------------------------------------------------------
 // Test cases
