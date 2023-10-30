@@ -3,6 +3,8 @@
 // ----------------------------------------------------------------------------
 module TinyBASIC
 
+open System
+
 type Value =
   | StringValue of string
   | NumberValue of int
@@ -36,10 +38,21 @@ type State =
 // Utilities
 // ----------------------------------------------------------------------------
 
-let printValue value = failwith "implemented in steps 1 and 3"
-let getLine state line = failwith "implemented in step 1"
-let addLine state (line, cmd) = failwith "implemented in step 2"
-
+let printValue value =
+  match value with
+  | StringValue s -> Console.Write(s)
+  | NumberValue i -> Console.Write(i)
+  | BoolValue b -> Console.Write(b)
+  
+let getLine state line =
+  let equals (l, _) = l = line
+  List.find equals state.Program
+  
+let addLine state (line, cmd) =
+  let newState = (line, cmd)::List.filter (fun (l, _) -> l <> line) state.Program |> List.sortBy fst
+  { Program = newState
+    Variables = state.Variables
+    Random = Random() }
 // ----------------------------------------------------------------------------
 // Evaluator
 // ----------------------------------------------------------------------------
@@ -49,35 +62,115 @@ let binaryRelOp f args =
   | [NumberValue a; NumberValue b] -> BoolValue(f a b)
   | _ -> failwith "expected two numerical arguments"
 
-let rec evalExpression expr = 
+let rec evalExpression state expr = 
   // TODO: We need an extra function 'MIN' that returns the smaller of
   // the two given numbers (in F#, the function 'min' does exactly this.)
-  failwith "implemented in steps 1, 3 and 4"
+  match expr with
+    | Const c -> c
+    | Function (name, expr) ->
+      let first, second =
+        match expr with
+        | [e1; e2] -> (evalExpression state e1, Some(evalExpression state e2))
+        | [e1] -> (evalExpression state e1, None)
+        | _ -> failwith "Expression should contain 2 elements as it is a binary function."
+      match name with
+      | "RND" ->
+        match (first) with
+        | NumberValue f -> NumberValue(state.Random.Next(f))
+        | _ -> failwith "Type mismatch!"
+      | ">" -> binaryRelOp (fun f s -> f > s) [first; second.Value]
+      | "<" ->  binaryRelOp (fun f s -> f < s) [first; second.Value]
+      | "||" ->
+        match (first, second.Value) with
+        | BoolValue f, BoolValue s -> BoolValue(f || s)
+        | _, _ -> failwith "Type mismatch!"
+      | "-" -> 
+        match (first, second.Value) with
+        | NumberValue f, NumberValue s -> NumberValue(f - s)
+        | _, _ -> failwith "Type mismatch!"
+      | "=" ->
+        match (first, second.Value) with
+        | BoolValue f, BoolValue s -> BoolValue(f = s)
+        | NumberValue f, NumberValue s -> BoolValue(f = s)
+        | StringValue f, StringValue s -> BoolValue(f = s)
+        | _, _ -> failwith "Type mismatch!"
+      | "MIN" ->
+        match (first, second.Value) with
+        | NumberValue f, NumberValue s -> NumberValue(min f s)
+        | _, _ -> failwith "Type mismatch!"
+      | _ -> failwith "Unsupported function name"
+    | Variable v -> state.Variables[v]
 
-let rec runCommand state (line, cmd) =
+let rec runCommand (state: State) ((line, cmd): int * Command): State =
   match cmd with 
+  | Print(expr) ->
+      let values = List.map (evalExpression state) expr
+      for value in values do
+        printValue value
+      runNextLine state line
   | Run ->
-      let first = List.head state.Program    
+      let first = List.head state.Program
       runCommand state first
+  | Goto(line) ->
+      let command = getLine state line
+      runCommand state command
+  | Assign (s, expr) ->
+    let value = evalExpression state expr
+    let newState = {
+      Program = state.Program
+      Variables = state.Variables.Add(s, value)
+      Random = state.Random
+    }
+    runNextLine newState line
+  | If (expr, command) ->
+    let value = evalExpression state expr
+    match value with
+    | BoolValue b -> if b then runCommand state (line, command) else runNextLine state line
+    | _ -> failwith "Result of if expression has to be a boolean."
+  | Clear ->
+    Console.Clear()
+    runNextLine state line
+  | Poke (x, y, char) ->
+    let first = evalExpression state x
+    let second = evalExpression state y
+    let character = evalExpression state char
+    match (first, second, character) with
+    | NumberValue f, NumberValue s, StringValue c ->
+      Console.CursorLeft <- f
+      Console.CursorTop <- s
+      Console.Write(c)
+      runNextLine state line
+    | _, _, _ -> failwith "Invalid x, y"
+    
+  | Input variableName ->
+    let input = Console.ReadLine()
+    match Int32.TryParse input with
+    | true, v ->
+      runCommand state (line, Assign(variableName, Const(NumberValue(v))))
+    | _ ->
+      Console.WriteLine "Could not parse, try again"
+      runCommand state (line, cmd)
+      
+  | Stop -> state
 
-  | Print(expr) -> failwith "implemented in step 1"
-  | Goto(line) -> failwith "implemented in step 1"
-  | Assign _ | If _ -> failwith "implemented in step 3"
-  | Clear | Poke _ -> failwith "implemented in step 4"
+and runNextLine state line =
+  let isGreater (l, _) = l > line
+  let newLine = List.tryFind isGreater state.Program
+  match newLine with
+  | None -> state
+  | Some command ->
+      runCommand state command
 
-  // TODO: Input("X") should read a number from the console using Console.RadLine
-  // and parse it as a number using Int32.TryParse (retry if the input is wrong)
-  // Stop terminates the execution (you can just return the 'state'.)
-  | Input _ | Stop _ -> failwith "not implemented"
-
-and runNextLine state line = failwith "implemented in step 1"
 
 // ----------------------------------------------------------------------------
 // Interactive program editing
 // ----------------------------------------------------------------------------
 
-let runInput state (line, cmd) = failwith "implemented in step 2"
-let runInputs state cmds = failwith "implemented in step 2"
+let runInput state (line, cmd) =
+  match line with
+  | None -> runCommand state (Int32.MaxValue, cmd)
+  | Some l -> addLine state (l, cmd)
+let runInputs state cmds = List.fold runInput state cmds 
 
 // ----------------------------------------------------------------------------
 // Test cases

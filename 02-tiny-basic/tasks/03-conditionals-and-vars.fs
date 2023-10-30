@@ -3,6 +3,8 @@
 // ----------------------------------------------------------------------------
 module TinyBASIC
 
+open System
+
 type Value =
   | StringValue of string
   // NOTE: Added numerical and Boolean values
@@ -27,8 +29,8 @@ type Command =
   | If of Expression * Command
 
 type State = 
-  { Program : list<int * Command> 
-    // TODO: Add variable context to the program state
+  { Program : list<int * Command>
+    Variables: Map<String, Value>
   }
 
 // ----------------------------------------------------------------------------
@@ -36,59 +38,95 @@ type State =
 // ----------------------------------------------------------------------------
 
 let printValue value = 
-  // TODO: Add support for printing NumberValue and BoolValue
-  failwith "implemented in step 1"
+  match value with
+  | StringValue s -> Console.WriteLine(s)
+  | NumberValue i -> Console.WriteLine(i)
+  | BoolValue b -> Console.WriteLine(b)
 
-let getLine state line = failwith "implemented in step 1"
-let addLine state (line, cmd) = failwith "implemented in step 2"
+let getLine state line =
+  let equals (l, _) = l = line
+  List.find equals state.Program
+  
+let addLine state (line, cmd) =
+  let newState = (line, cmd)::List.filter (fun (l, _) -> l <> line) state.Program |> List.sortBy fst
+  { Program = newState
+    Variables = state.Variables }
 
 // ----------------------------------------------------------------------------
 // Evaluator
 // ----------------------------------------------------------------------------
 
-let rec evalExpression expr = 
-  // TODO: Add support for 'Function' and 'Variable'. For now, handle just the two
-  // functions we need, i.e. "-" (takes two numbers & returns a number) and "="
-  // (takes two values and returns Boolean). Note that you can test if two
-  // F# values are the same using '='. It works on values of type 'Value' too.
-  //
-  // HINT: You will need to pass the program state to 'evalExpression' 
-  // in order to be able to handle variables!
-  failwith "implemented in step 1"
+let rec evalExpression state expr = 
+  match expr with
+    | Const c -> c
+    | Function (name, expr) ->
+      let first, second =
+        match expr with
+        | [e1; e2] -> (evalExpression state e1, evalExpression state e2)
+        | _ -> failwith "Expression should contain 2 elements as it is a binary function."
+      match name with
+      | "-" ->
+        match (first, second) with
+        | NumberValue f, NumberValue s -> NumberValue(f - s)
+        | _, _ -> failwith "Type mismatch!"
+      | "=" ->
+        match (first, second) with
+        | BoolValue f, BoolValue s -> BoolValue(f = s)
+        | NumberValue f, NumberValue s -> BoolValue(f = s)
+        | StringValue f, StringValue s -> BoolValue(f = s)
+        | _, _ -> failwith "Type mismatch!"
+      | _ -> failwith "Unsupported function name"
+    | Variable v -> state.Variables[v]
 
 let rec runCommand state (line, cmd) =
   match cmd with 
+  | Print(expr) ->
+      let value = evalExpression state expr
+      printValue value
+      runNextLine state line
   | Run ->
-      let first = List.head state.Program    
+      let first = List.head state.Program
       runCommand state first
+  | Goto(line) ->
+      let command = getLine state line
+      runCommand state command
 
-  | Print(expr) -> failwith "implemented in step 1"
-  | Goto(line) -> failwith "implemented in step 1"
+  | Assign (s, expr) ->
+    let value = evalExpression state expr
+    let newState = { Program = state.Program; Variables = state.Variables.Add(s, value) }
+    runNextLine newState line
   
-  // TODO: Implement assignment and conditional. Assignment should run the
-  // next line after setting the variable value. 'If' is a bit trickier:
-  // * 'l1: IF TRUE THEN GOTO <l1>' will continue evaluating on line 'l2'
-  // * 'l1: IF FALSE THEN GOTO <l1>' will continue on line after 'l1'
-  // * 'l1: IF TRUE THEN PRINT "HI"' will print HI and continue on line after 'l1'
-  //
-  // HINT: If <e> evaluates to TRUE, you can call 'runCommand' recursively with
-  // the command in the 'THEN' branch and the current line as the line number.
-  | Assign _ | If _ -> failwith "not implemented"
+  | If (expr, command) ->
+    let value = evalExpression state expr
+    match value with
+    | BoolValue b -> if b then runCommand state (line, command) else runNextLine state line
+    | _ -> failwith "Result of if expression has to be a boolean."
 
-and runNextLine state line = failwith "implemented in step 1"
+and runNextLine state line =
+  let isGreater (l, _) = l > line
+  let newLine = List.tryFind isGreater state.Program
+  match newLine with
+  | None -> state
+  | Some command ->
+      runCommand state command
 
 // ----------------------------------------------------------------------------
 // Interactive program editing
 // ----------------------------------------------------------------------------
 
-let runInput state (line, cmd) = failwith "implemented in step 2"
-let runInputs state cmds = failwith "implemented in step 2"
+let runInput state (line, cmd) =
+  match line with
+  | None -> runCommand state (Int32.MaxValue, cmd)
+  | Some l -> addLine state (l, cmd)
+  
+let runInputs state cmds = List.fold runInput state cmds 
 
 // ----------------------------------------------------------------------------
 // Test cases
 // ----------------------------------------------------------------------------
 
-let empty = { Program = [] } // TODO: Add empty variables to the initial state!
+let empty = { Program = []
+              Variables = Map.empty }
 
 let helloOnce = 
   [ Some 10, Print (Const (StringValue "HELLO WORLD\n")) 
@@ -107,7 +145,8 @@ let testVariables =
     Some 30, Assign("B", Function("=", [Variable("I"); Const(NumberValue 1)]))
     Some 40, Print(Variable "S") 
     Some 50, Print(Variable "I") 
-    Some 60, Print(Variable "B") ]
+    Some 60, Print(Variable "B")
+    None, Run ]
 
 // NOTE: Simpler test program without 'If" (just variables and '=' function) 
 runInputs empty testVariables |> ignore
