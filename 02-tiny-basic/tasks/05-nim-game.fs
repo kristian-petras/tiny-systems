@@ -141,7 +141,6 @@ let rec runCommand (state: State) ((line, cmd): int * Command): State =
       Console.Write(c)
       runNextLine state line
     | _, _, _ -> failwith "Invalid x, y"
-    
   | Input variableName ->
     let input = Console.ReadLine()
     match Int32.TryParse input with
@@ -150,7 +149,6 @@ let rec runCommand (state: State) ((line, cmd): int * Command): State =
     | _ ->
       Console.WriteLine "Could not parse, try again"
       runCommand state (line, cmd)
-      
   | Stop -> state
 
 and runNextLine state line =
