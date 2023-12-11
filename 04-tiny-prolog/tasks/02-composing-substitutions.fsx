@@ -2,6 +2,8 @@
 // 02 - Composing and applying substitutions
 // ----------------------------------------------------------------------------
 
+open System
+
 type Term = 
   | Atom of string
   | Variable of string
@@ -22,11 +24,16 @@ let rule p b = { Head = p; Body = b }
 // ----------------------------------------------------------------------------
 
 let rec substitute (subst:Map<string, Term>) term = 
-  // TODO: Replace all variables that appear in 'subst'
+  // TODO: Replace all variables that appear in 'term'
+  // replace some of the variables in the term for which there is a replacement specified by 'subst'
   // with the replacement specified by 'subst.[var]'.
   // You can assume the terms in 'subst' do not contain
   // any of the variables that we want to replace.
-  failwith "not implemented"
+  match term with
+  | Atom _ -> term
+  | Variable var when subst.ContainsKey var -> subst[var]
+  | Predicate(s, terms) -> Predicate(s, terms |> List.map (substitute subst))
+  | Variable _ -> term
 
 
 let substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>) = 
@@ -34,15 +41,15 @@ let substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>) =
   // in the existing substitiution 'subst'. (We represent one 
   // as a map and the other as a list of pairs, which is a bit 
   // inelegant, but it makes calling this function easier later.)
-  failwith "not implemented"
+  subst |> List.map (fun (name, term) -> (name, substitute newSubst term))
 
 
 let substituteTerms subst (terms:list<Term>) = 
   // TODO: Apply substitution 'subst' to all the terms in 'terms'
-  failwith "not implemented"
+  terms |> List.map (substitute subst)
 
 
-let rec unifyLists l1 l2 = 
+let rec unifyLists l1 l2 : option<list<string * Term>> = 
   // TODO: Modify the implementation to use 'substituteTerms' and 'substituteSubst'.
   //
   // Let's say that your code calls 'unify h1 h2' to get a substitution 's1'
@@ -53,10 +60,30 @@ let rec unifyLists l1 l2 =
   // (2) The substitution 's2' is applied to all terms in substitution 's1' before returning
   //
   // You can look at your ML type inference code. The structure is very similar! 
-  failwith "implemented in step 1"
+  match l1, l2 with 
+  | [], [] ->
+      Some(list.Empty)
+  | h1::t1, h2::t2 -> 
+      let l1 = unify h1 h2
+      match l1 with
+      | None -> None
+      | Some subst ->
+        let newTerms1 = substituteTerms (Map.ofList subst) t1
+        let newTerms2 = substituteTerms (Map.ofList subst) t2
+        let l2 = unifyLists newTerms1 newTerms2
+        match l2 with
+        | None -> None
+        | Some secondSubst ->
+          let x = substituteSubst (Map.ofList secondSubst) subst
+          Some(x @ secondSubst)
+  | _ -> None
 
-and unify t1 t2 = 
-  failwith "implemented in step 1"
+and unify (t1: Term) (t2: Term): (string * Term) list option =
+  match t1, t2 with
+  | Atom a, Atom b -> if a = b then Some(list.Empty) else None
+  | Variable s, t | t, Variable s -> Some([s, t])
+  | Predicate(s1, terms1), Predicate(s2, terms2) -> if s1 = s2 then unifyLists terms1 terms2 else None
+  | _ -> None
 
 // ----------------------------------------------------------------------------
 // Advanced unification tests requiring correct substitution

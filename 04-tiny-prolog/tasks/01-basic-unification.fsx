@@ -32,27 +32,33 @@ let rule p b = { Head = p; Body = b }
 
 let rec unifyLists l1 l2 : option<list<string * Term>> = 
   match l1, l2 with 
-  | [], [] -> 
+  | [], [] ->
       // TODO: Succeeds, but returns an empty substitution
-      failwith "not implemented"
+      Some(list.Empty)
   | h1::t1, h2::t2 -> 
       // TODO: Unify 'h1' with 'h2' using 'unify' and
       // 't1' with 't2' using 'unifyLists'. If both 
       // succeed, return the generated joint substitution!
-      failwith "not implemented"
+      let l1 = unify h1 h2
+      let l2 = unifyLists t1 t2
+      match l1, l2 with
+      | Some value1, Some value2 -> Some(value1 @ value2)
+      | _ -> None
   | _ -> 
-    // TODO: Lists cannot be unified 
-    failwith "not implemented"
+    // TODO: Lists cannot be unified
+    None
 
-and unify t1 t2 = 
+and unify (t1: Term) (t2: Term): (string * Term) list option = 
   match t1, t2 with 
-  | _ ->
       // TODO: Add all the necessary cases here!
       // * For matching atoms, return empty substitution
       // * For matching predicates, return the result of 'unifyLists'
       // * For variable and any term, return a new substitution
       // * For anything else, return None (failed to unify)
-      failwith "not implemented"
+  | Atom a, Atom b -> if a = b then Some(list.Empty) else None
+  | Variable s, t | t, Variable s -> Some([s, t])
+  | Predicate(s1, terms1), Predicate(s2, terms2) -> if s1 = s2 then unifyLists terms1 terms2 else None
+  | _ -> None
 
 // ----------------------------------------------------------------------------
 // Basic unification tests 
