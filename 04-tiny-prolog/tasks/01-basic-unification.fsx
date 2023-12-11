@@ -54,7 +54,7 @@ and unify (t1: Term) (t2: Term): (string * Term) list option =
       // * For matching atoms, return empty substitution
       // * For matching predicates, return the result of 'unifyLists'
       // * For variable and any term, return a new substitution
-      // * For anything else, return None (failed to unify)
+      // * For anything else, return None (failed to unify) 
   | Atom a, Atom b -> if a = b then Some(list.Empty) else None
   | Variable s, t | t, Variable s -> Some([s, t])
   | Predicate(s1, terms1), Predicate(s2, terms2) -> if s1 = s2 then unifyLists terms1 terms2 else None
