@@ -92,12 +92,10 @@ let withFreshVariables (clause:Clause) : Clause =
 let query (program:list<Clause>) (query:Term) =
   program
     |> List.map withFreshVariables
-    |> List.map (fun f -> f.Head)
-    |> List.map (unify query)
-    |> List.zip program
-    |> List.choose (fun (a, b) -> match b with
-                                  | None -> None
-                                  | Some value -> Some(a, value))
+    |> List.map (fun fresh -> (fresh, unify query fresh.Head))
+    |> List.choose (fun (fresh, substituted) -> match substituted with
+                                                  | None -> None
+                                                  | Some value -> Some(fresh, value))
 
 let rec solve (program: list<Clause>) (subst:list<string*Term>) (goals: list<Term>) = 
   match goals with 
@@ -112,8 +110,6 @@ let rec solve (program: list<Clause>) (subst:list<string*Term>) (goals: list<Ter
       // append the two and call 'solve' recursively with this new substitution
       // to solve the new goals.
       let matches = query program g
-      Console.WriteLine("matches")
-      Console.WriteLine(matches)
       for clause, newSubst in matches do
         let newGoals = substituteTerms (Map.ofList newSubst) (clause.Body @ goals)
         let subst = substituteSubst (Map.ofList newSubst) subst

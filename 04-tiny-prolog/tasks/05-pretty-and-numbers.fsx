@@ -118,12 +118,10 @@ let withFreshVariables (clause:Clause) : Clause =
 let query (program:list<Clause>) (query:Term) =
   program
     |> List.map withFreshVariables
-    |> List.map (fun f -> f.Head)
-    |> List.map (unify query)
-    |> List.zip program
-    |> List.choose (fun (a, b) -> match b with
-                                  | None -> None
-                                  | Some value -> Some(a, value))
+    |> List.map (fun fresh -> (fresh, unify query fresh.Head))
+    |> List.choose (fun (fresh, substituted) -> match substituted with
+                                                  | None -> None
+                                                  | Some value -> Some(fresh, value))
 
 let rec solve program subst goals =
   // TODO: When printing the computed substitution 'subst', print
