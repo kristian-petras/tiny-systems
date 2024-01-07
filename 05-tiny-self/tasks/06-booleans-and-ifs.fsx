@@ -96,7 +96,7 @@ let exprSendWith msg args rcv = failwith<Objekt> "Implemented in step 5"
   
 let exprNew slots = makeDataObject [
   makeSlot "slots" (makeDataObject [ for k, v in slots -> makeSlot k v ])
-  makeSlot "eval" (makeNativeMethod (fun msg ->
+  makeSlot "eval" (makeNativeMethod (fun arcd ->
     // TODO: Expression that represents the creation of a new data object.
     // To evaluate this, retrieve & evaluate all expressions in 'slots'
     // (similar to evaluation of arguments in 'exprSendWith') and 

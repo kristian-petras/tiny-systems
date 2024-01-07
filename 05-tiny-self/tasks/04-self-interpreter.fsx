@@ -130,7 +130,7 @@ let exprSend msg rcv = makeDataObject [
   makeSlot "eval" (makeNativeMethod (fun arcd -> 
     // TODO: To evalaute 'send' expression, we need to:
     // * Get 'activation' (activation record of the method call we are 
-    ///  interpreting) from the activation record 'arcd' and create
+    //   interpreting) from the activation record 'arcd' and create
     //   a new data object with this as the 'activation' to be used
     //   as an argument of recursive 'eval' call(s) later
     // * Get the string value of 'msg' slot (lookup from the 'acrd')
