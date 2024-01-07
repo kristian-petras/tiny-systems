@@ -133,13 +133,12 @@ let rec generate (ctx:TypingContext) e =
           TyTuple(t1, t2), s1 @ s2
 
       | TupleGet(b, e) ->
-          // TODO: Trickier. The type of 'e' is some tuple, but we do not know what.
-          // We need to generate two new type variables and a constraint.
-          let t1, s1 = generate ctx e
-          // TODO: FIX
-          match t1 with
-          | TyTuple(l, r) -> if b then l, s1 @ [] else r, s1 @ []
-          | _ -> failwith "upsik"
+          let t1 = newTyVariable()
+          let t2 = newTyVariable()
+          let t, s = generate ctx e
+          let constraints = s @ [t, TyTuple(t1, t2)]
+          let returnType = if b then t1 else t2
+          returnType, constraints
 
 // ----------------------------------------------------------------------------
 // Putting it together & test cases
